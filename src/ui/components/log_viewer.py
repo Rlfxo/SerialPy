@@ -1,9 +1,10 @@
 from PyQt5.QtWidgets import (QWidget, QTextEdit, QVBoxLayout, 
-                           QPushButton, QHBoxLayout, QMessageBox)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QTextCursor
+                           QPushButton, QHBoxLayout, QMessageBox, QLineEdit)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QTextDocument
 import datetime
 import os
+from PyQt5.QtWidgets import QApplication
 
 class SerialReaderThread(QThread):
     data_received = pyqtSignal(str)
@@ -80,6 +81,21 @@ class LogViewer(QWidget):
         button_layout.addStretch()
         
         layout.addLayout(button_layout)
+        
+        # 스팟 검색 UI 추가
+        self.search_layout = QHBoxLayout()
+        self.spot_edit = QLineEdit()
+        self.spot_edit.setPlaceholderText("Spotlight 검색")
+        self.search_layout.addWidget(self.spot_edit)
+        layout.addLayout(self.search_layout)
+        
+        # 검색 타이머 설정 (성능 최적화)
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self.perform_search)
+        
+        self.spot_edit.textChanged.connect(self.schedule_search)
+        
         self.setLayout(layout)
 
     def start_monitoring(self, serial_port):
@@ -185,3 +201,49 @@ class LogViewer(QWidget):
                                   f"선택된 로그가 저장되었습니다.\n저장 위치: {filepath}")
         except Exception as e:
             QMessageBox.critical(self, "저장 실패", f"로그 저장 중 오류 발생: {str(e)}")
+
+    def schedule_search(self):
+        """검색 타이머 시작 (타이핑 중에는 검색하지 않음)"""
+        self.search_timer.start(300)  # 300ms 후에 검색 시작
+        
+    def perform_search(self):
+        """실제 검색 수행"""
+        search_text = self.spot_edit.text()
+        if not search_text:
+            # 검색어가 없으면 하이라이트 제거
+            cursor = self.log_text.textCursor()
+            cursor.select(QTextCursor.Document)
+            cursor.setCharFormat(QTextCharFormat())
+            return
+            
+        try:
+            cursor = self.log_text.textCursor()
+            format = QTextCharFormat()
+            format.setBackground(QColor("yellow"))
+            format.setForeground(QColor("black"))  # 글자색을 검은색으로 설정
+            
+            # 이전 하이라이트 제거
+            cursor.select(QTextCursor.Document)
+            cursor.setCharFormat(QTextCharFormat())
+            
+            # 최근 1000줄만 검색 (성능 최적화)
+            document = self.log_text.document()
+            block_count = document.blockCount()
+            start_block = max(0, block_count - 1000)
+            
+            finder = QTextDocument.FindFlags()
+            pos = document.findBlockByNumber(start_block).position()
+            
+            while True:
+                cursor = document.find(search_text, pos, finder)
+                if cursor.isNull():
+                    break
+                    
+                cursor.mergeCharFormat(format)
+                pos = cursor.position()
+                
+                # UI 응답성을 위해 주기적으로 이벤트 처리
+                QApplication.processEvents()
+                
+        except Exception as e:
+            print(f"검색 중 오류 발생: {str(e)}")
