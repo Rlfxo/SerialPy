@@ -67,12 +67,12 @@ class QCWindow(QMainWindow):
         button_layout = QHBoxLayout()
         
         # 관리 기능 버튼들
-        header_btn = QPushButton('Header 관리')
+        self.header_button = QPushButton("Header 정보")
         device_btn = QPushButton('Device 정보')
         download_btn = QPushButton('Download')
         
         # 버튼 스타일 설정
-        for btn in [header_btn, device_btn, download_btn]:
+        for btn in [self.header_button, device_btn, download_btn]:
             btn.setFixedSize(150, 40)
             btn.setStyleSheet("""
                 QPushButton {
@@ -88,12 +88,12 @@ class QCWindow(QMainWindow):
             """)
         
         # 버튼 이벤트 연결
-        header_btn.clicked.connect(self.show_header_management)
+        self.header_button.clicked.connect(self.show_header_management)
         device_btn.clicked.connect(self.show_device_management)
         download_btn.clicked.connect(self.show_download_management)
         
         button_layout.addStretch()
-        button_layout.addWidget(header_btn)
+        button_layout.addWidget(self.header_button)
         button_layout.addWidget(device_btn)
         button_layout.addWidget(download_btn)
         button_layout.addStretch()
