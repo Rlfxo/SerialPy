@@ -5,6 +5,8 @@ from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QTextDocument
 import datetime
 import os
 from PyQt5.QtWidgets import QApplication
+import re
+from PyQt5.QtWidgets import QScrollBar
 
 class SerialReaderThread(QThread):
     data_received = pyqtSignal(str)
@@ -33,8 +35,11 @@ class LogViewer(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.reader_thread = None
+        self.user_scrolling = False
+        self.scroll_timer = None
         self.log_dir = self._ensure_log_directory()
         self.initUI()
+        self.setup_scroll_handling()
 
     def _ensure_log_directory(self):
         """로그 디렉토리 생성 및 경로 반환"""
@@ -51,7 +56,7 @@ class LogViewer(QWidget):
         # 로그 표시 영역
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setLineWrapMode(QTextEdit.NoWrap)  # 자동 줄바꿈 비활성화
+        self.log_text.setLineWrapMode(QTextEdit.NoWrap)
         
         # 모노스페이스 폰트 설정
         font = self.log_text.font()
@@ -98,35 +103,71 @@ class LogViewer(QWidget):
         
         self.setLayout(layout)
 
+    def setup_scroll_handling(self):
+        """스크롤 이벤트 처리 설정"""
+        scrollbar = self.log_text.verticalScrollBar()
+        scrollbar.valueChanged.connect(self.on_scroll_value_changed)
+        scrollbar.sliderPressed.connect(self.on_scroll_pressed)
+        scrollbar.sliderReleased.connect(self.on_scroll_released)
+
+    def on_scroll_pressed(self):
+        """사용자가 스크롤바를 드래그하기 시작할 때"""
+        self.user_scrolling = True
+
+    def on_scroll_released(self):
+        """사용자가 스크롤바 드래그를 멈출 때"""
+        scrollbar = self.log_text.verticalScrollBar()
+        # 스크롤바가 맨 아래에 있으면 자동 스크롤 재개
+        if scrollbar.value() == scrollbar.maximum():
+            self.user_scrolling = False
+
+    def on_scroll_value_changed(self, value):
+        """스크롤바 값이 변경될 때"""
+        scrollbar = self.log_text.verticalScrollBar()
+        # 맨 아래로 스크롤되면 자동 스크롤 재개
+        if value == scrollbar.maximum():
+            self.user_scrolling = False
+
     def start_monitoring(self, serial_port):
         """시리얼 모니터링 시작"""
         if self.reader_thread is not None:
             self.stop_monitoring()
         
         self.reader_thread = SerialReaderThread(serial_port)
-        self.reader_thread.data_received.connect(self.append_log)
+        self.reader_thread.data_received.connect(self.process_log)
         self.reader_thread.start()
 
     def stop_monitoring(self):
         """시리얼 모니터링 중지"""
-        if self.reader_thread:
+        if self.reader_thread is not None:
             self.reader_thread.stop()
-            self.reader_thread.wait()
+            self.reader_thread.wait()  # 스레드가 완전히 종료될 때까지 대기
             self.reader_thread = None
+
+    def process_log(self, text):
+        """로그 텍스트 처리"""
+        cursor = self.log_text.textCursor()
+        
+        # ANSI 이스케이프 코드 제거
+        ansi_pattern = re.compile(r'\x1b\[\d+m')
+        clean_text = ansi_pattern.sub('', text)
+        
+        # 텍스트 추가
+        cursor.insertText(clean_text)
+        
+        # 자동 스크롤 처리
+        if self.auto_scroll_btn.isChecked() and not self.user_scrolling:
+            scrollbar = self.log_text.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
 
     def append_log(self, text):
         """로그 추가"""
-        timestamp = datetime.datetime.now().strftime('[%H:%M:%S.%f')[:-3] + '] '
-        self.log_text.append(timestamp + text.strip())
-        
-        # 자동 스크롤이 활성화되어 있으면 스크롤
-        if self.auto_scroll_btn.isChecked():
-            scrollbar = self.log_text.verticalScrollBar()
-            scrollbar.setValue(scrollbar.maximum())
+        self.process_log(text)
 
     def clear_log(self):
         """로그 지우기"""
         self.log_text.clear()
+        self.user_scrolling = False  # 스크롤 상태 초기화
 
     def save_log(self):
         """전체 로그 저장"""
