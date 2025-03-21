@@ -100,6 +100,10 @@ class QCWindow(QMainWindow):
         
         main_layout.addLayout(button_layout)
 
+        # 시리얼 포트 연결 시그널 연결
+        self.left_port_selector.port_connected.connect(self.on_left_port_connection_changed)
+        self.right_port_selector.port_connected.connect(self.on_right_port_connection_changed)
+
     def show_header_management(self):
         if not self.management_dialog:
             self.management_dialog = QCManagementDialog(self)
@@ -117,3 +121,21 @@ class QCWindow(QMainWindow):
             self.management_dialog = QCManagementDialog(self)
         self.management_dialog.show_download_tab()
         self.management_dialog.exec_()
+
+    def on_left_port_connection_changed(self, connected):
+        if connected:
+            serial_port = self.left_port_selector.get_serial_port()
+            self.left_log_viewer.start_monitoring(serial_port)
+            print("Left monitor started")
+        else:
+            self.left_log_viewer.stop_monitoring()
+            print("Left monitor stopped")
+
+    def on_right_port_connection_changed(self, connected):
+        if connected:
+            serial_port = self.right_port_selector.get_serial_port()
+            self.right_log_viewer.start_monitoring(serial_port)
+            print("Right monitor started")
+        else:
+            self.right_log_viewer.stop_monitoring()
+            print("Right monitor stopped")
