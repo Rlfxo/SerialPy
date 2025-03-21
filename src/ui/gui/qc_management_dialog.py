@@ -19,6 +19,12 @@ class HeaderManager:
             'debug_level': {'size': 1, 'editable': True}
         }
 
+    def format_hex_value(self, value: bytes, field: str) -> str:
+        """헥사값을 형식에 맞게 포맷팅"""
+        if field in ['debug_level', 'image_type']:  # 1바이트 필드
+            return f"0x{value.hex().upper():0>2}"  # 0x 형식으로 수정
+        return value.hex().upper()
+
     def read_header(self, file_path):
         try:
             with open(file_path, 'rb') as f:
@@ -34,20 +40,17 @@ class HeaderManager:
                     value = file_data[offset:offset + size]
 
                     if field == 'sha256':
-                        # SHA256은 나중에 계산
                         header_info[field] = value.hex()
                     elif field == 'length':
-                        # length는 4바이트 정수
                         header_info[field] = int.from_bytes(value, 'little')
                     elif field in ['model_name', 'cpo_id', 'dev_version']:
-                        # 문자열 필드는 null 바이트 제거 후 디코딩
                         try:
                             header_info[field] = value.split(b'\x00')[0].decode('utf-8')
                         except:
                             header_info[field] = "N/A"
                     else:
-                        # 나머지 필드는 hex 문자열로 변환
-                        header_info[field] = value.hex()
+                        # 1바이트 필드는 0x 형식으로 표시
+                        header_info[field] = self.format_hex_value(value, field)
 
                     offset += size
 
@@ -84,9 +87,12 @@ class HeaderManager:
                     encoded = str(value).encode('utf-8')
                     header[current_offset:current_offset + size] = encoded.ljust(size, b'\x00')[:size]
                 else:
-                    # 나머지 필드는 16진수 문자열을 바이트로 변환
-                    hex_value = bytes.fromhex(value)
-                    header[current_offset:current_offset + size] = hex_value
+                    # 0x 접두어가 있으면 제거
+                    hex_value = value.replace('0x', '')
+                    # 1바이트 필드는 항상 2자리 헥사값으로 처리
+                    if field in ['debug_level', 'image_type']:
+                        hex_value = hex_value.zfill(2)
+                    header[current_offset:current_offset + size] = bytes.fromhex(hex_value)
                     
             except Exception as e:
                 raise ValueError(f"필드 '{field}' 변환 실패: {str(e)}")
@@ -243,6 +249,9 @@ class QCManagementDialog(QDialog):
                             display_value = f"{value:,} bytes"
                         elif field_name == 'sha256':
                             display_value = self.format_sha256(value)
+                        elif field_name in ['debug_level', 'image_type']:
+                            # 1바이트 필드는 항상 0x00 형식으로 표시
+                            display_value = value  # 이미 format_hex_value에서 처리됨
                         else:
                             display_value = str(value)
                             
