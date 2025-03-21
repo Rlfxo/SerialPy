@@ -1,0 +1,10 @@
+# System Requirements:
+# - OpenOCD (http://openocd.org/)
+#   - Windows: Download and add to PATH
+#   - macOS: brew install open-ocd
+#   - Linux: sudo apt-get install openocd
+#
+PyQt5>=5.15.0
+pyinstaller>=6.3.0
+pyserial>=3.5
+esptool>=4.0 
