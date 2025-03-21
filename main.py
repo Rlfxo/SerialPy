@@ -1,9 +1,10 @@
 import sys
 import os
 import subprocess
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMessageBox, QPushButton
 from PyQt5.QtCore import Qt
 from src.ui.main_window import MainWindow
+from src.ui.styles.button_styles import ButtonStyles
 
 def check_openocd():
     try:
