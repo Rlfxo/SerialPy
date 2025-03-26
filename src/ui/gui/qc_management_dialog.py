@@ -1,9 +1,11 @@
 from PyQt5.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QWidget, 
                            QTableWidget, QTableWidgetItem, QHeaderView,
-                           QPushButton, QHBoxLayout, QFileDialog, QMessageBox)
+                           QPushButton, QHBoxLayout, QFileDialog, QMessageBox,
+                           QGroupBox, QGridLayout, QLabel, QLineEdit, QFrame)
 from PyQt5.QtCore import Qt
 import hashlib
 import binascii
+from ..components.download_panel import DownloadPanel
 
 class HeaderManager:
     def __init__(self):
@@ -130,12 +132,10 @@ class QCManagementDialog(QDialog):
         self.device_tab = QWidget()
         self.download_tab = QWidget()
         
-        # Header 정보 탭 설정
+        # 탭별 컴포넌트 설정
         self._setup_header_tab()
-        
-        # 나머지 탭은 빈 레이아웃으로 설정
-        self.device_tab.setLayout(QVBoxLayout())
-        self.download_tab.setLayout(QVBoxLayout())
+        self._setup_device_tab()  # Device 탭 설정 호출
+        self._setup_download_tab()
         
         # 탭 추가
         self.tab_widget.addTab(self.header_tab, "Header 정보")
@@ -315,14 +315,106 @@ class QCManagementDialog(QDialog):
             QMessageBox.critical(self, "오류", f"파일 저장 중 오류 발생: {str(e)}")
 
     def _setup_device_tab(self):
+        """Device 정보 탭 설정"""
         layout = QVBoxLayout(self.device_tab)
-        self.device_info = DeviceInfoPanel(mode='qc')
-        layout.addWidget(self.device_info)
+
+        # 상단: 모델 정보 읽기 영역
+        read_group = QGroupBox("모델 정보 읽기")
+        read_layout = QVBoxLayout()
+
+        # 읽기 결과 표시 영역
+        read_info_layout = QGridLayout()
+        
+        # 모델명
+        read_info_layout.addWidget(QLabel("모델명:"), 0, 0)
+        self.model_name_label = QLabel("-")
+        read_info_layout.addWidget(self.model_name_label, 0, 1)
+        
+        # 시리얼 번호
+        read_info_layout.addWidget(QLabel("시리얼 번호:"), 1, 0)
+        self.serial_number_label = QLabel("-")
+        read_info_layout.addWidget(self.serial_number_label, 1, 1)
+        
+        # 버전
+        read_info_layout.addWidget(QLabel("버전:"), 2, 0)
+        self.version_label = QLabel("-")
+        read_info_layout.addWidget(self.version_label, 2, 1)
+
+        read_layout.addLayout(read_info_layout)
+
+        # 읽기 버튼
+        read_button_layout = QHBoxLayout()
+        read_button = QPushButton("정보 읽기")
+        read_button.clicked.connect(self.read_model_info)
+        read_button_layout.addWidget(read_button)
+        read_button_layout.addStretch()
+        read_layout.addLayout(read_button_layout)
+
+        read_group.setLayout(read_layout)
+        layout.addWidget(read_group)
+
+        # 구분선 추가
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(line)
+
+        # 하단: 모델 정보 쓰기 영역
+        write_group = QGroupBox("모델 정보 쓰기")
+        write_layout = QVBoxLayout()
+
+        # 쓰기 입력 영역
+        write_info_layout = QGridLayout()
+        
+        # 모델명 입력
+        write_info_layout.addWidget(QLabel("모델명:"), 0, 0)
+        self.model_name_edit = QLineEdit()
+        write_info_layout.addWidget(self.model_name_edit, 0, 1)
+        
+        # 시리얼 번호 입력
+        write_info_layout.addWidget(QLabel("시리얼 번호:"), 1, 0)
+        self.serial_number_edit = QLineEdit()
+        write_info_layout.addWidget(self.serial_number_edit, 1, 1)
+        
+        # 버전 입력
+        write_info_layout.addWidget(QLabel("버전:"), 2, 0)
+        self.version_edit = QLineEdit()
+        write_info_layout.addWidget(self.version_edit, 2, 1)
+
+        write_layout.addLayout(write_info_layout)
+
+        # 쓰기 버튼
+        write_button_layout = QHBoxLayout()
+        write_button = QPushButton("정보 쓰기")
+        write_button.clicked.connect(self.write_model_info)
+        write_button_layout.addWidget(write_button)
+        write_button_layout.addStretch()
+        write_layout.addLayout(write_button_layout)
+
+        write_group.setLayout(write_layout)
+        layout.addWidget(write_group)
+
+        # 여백 추가
+        layout.addStretch()
+
+    def read_model_info(self):
+        """모델 정보 읽기"""
+        QMessageBox.information(self, "알림", "모델 정보 읽기 기능이 구현될 예정입니다.")
+
+    def write_model_info(self):
+        """모델 정보 쓰기"""
+        QMessageBox.information(self, "알림", "모델 정보 쓰기 기능이 구현될 예정입니다.")
 
     def _setup_download_tab(self):
+        """Download 탭 설정"""
         layout = QVBoxLayout(self.download_tab)
+        
+        # 다운로드 패널 추가
         self.download_panel = DownloadPanel()
         layout.addWidget(self.download_panel)
+        
+        # 여백 추가
+        layout.addStretch()
 
     def show_header_tab(self):
         self.tab_widget.setCurrentIndex(0)
