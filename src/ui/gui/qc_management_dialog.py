@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt
 import hashlib
 import binascii
 from ..components.download_panel import DownloadPanel
+import time
 
 class HeaderManager:
     def __init__(self):
@@ -516,12 +517,41 @@ class QCManagementDialog(QDialog):
 
     def write_model_info(self):
         """모델 정보 쓰기"""
+        # 선택된 포트가 연결되어 있는지 확인
         if not self._check_selected_port_connected():
+            QMessageBox.warning(self, "경고", "선택된 포트가 연결되어 있지 않습니다.")
             return
+
+        try:
+            # 입력된 모델명과 시리얼 번호 가져오기
+            model_name = self.model_name_edit.text().strip()
+            serial_number = self.serial_number_edit.text().strip()
+
+            # 입력값 검증
+            if not model_name or not serial_number:
+                QMessageBox.warning(self, "경고", "모델명과 시리얼 번호를 모두 입력해주세요.")
+                return
+
+            # 명령어 생성
+            command = f"db w model 1 {model_name} {serial_number}\r\n"
             
-        # TODO: 선택된 포트로 명령어 전송
-        selected_port = "Monitor 1" if self.port1_radio.isChecked() else "Monitor 2"
-        QMessageBox.information(self, "알림", f"{selected_port}을 통해 모델 정보를 씁니다.")
+            # 선택된 시리얼 포트 가져오기
+            serial_port = self._get_selected_serial_port()
+            
+            # 명령어 전송
+            serial_port.write(command.encode())
+            
+            # 응답 대기 (필요한 경우)
+            time.sleep(0.1)
+            
+            # 성공 메시지 표시
+            QMessageBox.information(self, "성공", "모델 정보가 성공적으로 저장되었습니다.")
+            
+            # 저장 후 자동으로 정보 다시 읽기
+            self.read_model_info()
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"모델 정보 저장 중 오류가 발생했습니다: {str(e)}")
 
     def _check_selected_port_connected(self):
         """선택된 포트의 연결 상태 확인"""
