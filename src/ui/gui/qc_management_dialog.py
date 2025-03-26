@@ -1,7 +1,8 @@
 from PyQt5.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QWidget, 
                            QTableWidget, QTableWidgetItem, QHeaderView,
                            QPushButton, QHBoxLayout, QFileDialog, QMessageBox,
-                           QGroupBox, QGridLayout, QLabel, QLineEdit, QFrame)
+                           QGroupBox, QGridLayout, QLabel, QLineEdit, QFrame,
+                           QRadioButton)
 from PyQt5.QtCore import Qt
 import hashlib
 import binascii
@@ -143,6 +144,12 @@ class QCManagementDialog(QDialog):
         self.tab_widget.addTab(self.download_tab, "Download")
         
         layout.addWidget(self.tab_widget)
+
+        # 포트 상태 변경 시 업데이트를 위한 시그널 연결
+        if hasattr(parent, 'left_port_selector'):
+            parent.left_port_selector.port_connected.connect(self.update_port_status)
+        if hasattr(parent, 'right_port_selector'):
+            parent.right_port_selector.port_connected.connect(self.update_port_status)
 
     def _setup_header_tab(self):
         """Header 정보 탭 설정"""
@@ -318,6 +325,32 @@ class QCManagementDialog(QDialog):
         """Device 정보 탭 설정"""
         layout = QVBoxLayout(self.device_tab)
 
+        # 포트 선택 영역
+        port_group = QGroupBox("통신 포트 선택")
+        port_layout = QHBoxLayout()
+        
+        # 포트 선택 라디오 버튼
+        self.port1_radio = QRadioButton("Monitor 1")
+        self.port2_radio = QRadioButton("Monitor 2")
+        self.port1_radio.setChecked(True)  # 기본값 Monitor 1
+        
+        # 현재 연결 상태 표시 레이블
+        self.port1_status = QLabel("미연결")
+        self.port2_status = QLabel("미연결")
+        self.port1_status.setStyleSheet("color: red")
+        self.port2_status.setStyleSheet("color: red")
+        
+        # 포트 선택 영역 레이아웃
+        port_layout.addWidget(self.port1_radio)
+        port_layout.addWidget(self.port1_status)
+        port_layout.addSpacing(20)  # 간격 추가
+        port_layout.addWidget(self.port2_radio)
+        port_layout.addWidget(self.port2_status)
+        port_layout.addStretch()
+        
+        port_group.setLayout(port_layout)
+        layout.addWidget(port_group)
+
         # 상단: 모델 정보 읽기 영역
         read_group = QGroupBox("모델 정보 읽기")
         read_layout = QVBoxLayout()
@@ -334,11 +367,6 @@ class QCManagementDialog(QDialog):
         read_info_layout.addWidget(QLabel("시리얼 번호:"), 1, 0)
         self.serial_number_label = QLabel("-")
         read_info_layout.addWidget(self.serial_number_label, 1, 1)
-        
-        # 버전
-        read_info_layout.addWidget(QLabel("버전:"), 2, 0)
-        self.version_label = QLabel("-")
-        read_info_layout.addWidget(self.version_label, 2, 1)
 
         read_layout.addLayout(read_info_layout)
 
@@ -375,11 +403,6 @@ class QCManagementDialog(QDialog):
         write_info_layout.addWidget(QLabel("시리얼 번호:"), 1, 0)
         self.serial_number_edit = QLineEdit()
         write_info_layout.addWidget(self.serial_number_edit, 1, 1)
-        
-        # 버전 입력
-        write_info_layout.addWidget(QLabel("버전:"), 2, 0)
-        self.version_edit = QLineEdit()
-        write_info_layout.addWidget(self.version_edit, 2, 1)
 
         write_layout.addLayout(write_info_layout)
 
@@ -397,13 +420,120 @@ class QCManagementDialog(QDialog):
         # 여백 추가
         layout.addStretch()
 
+        # 포트 연결 상태 업데이트 메서드 연결
+        self.update_port_status()
+
+    def update_port_status(self):
+        """포트 연결 상태 업데이트"""
+        # QCWindow의 포트 상태 확인
+        if hasattr(self.parent(), 'left_port_selector'):
+            port_selector = self.parent().left_port_selector
+            is_connected = port_selector.is_connected
+            port_name = port_selector.port_combo.currentText() if is_connected else ""
+            
+            status_text = f"{port_name} 연결됨" if is_connected else "미연결"
+            self.port1_status.setText(status_text)
+            self.port1_status.setStyleSheet("color: green" if is_connected else "color: red")
+        
+        if hasattr(self.parent(), 'right_port_selector'):
+            port_selector = self.parent().right_port_selector
+            is_connected = port_selector.is_connected
+            port_name = port_selector.port_combo.currentText() if is_connected else ""
+            
+            status_text = f"{port_name} 연결됨" if is_connected else "미연결"
+            self.port2_status.setText(status_text)
+            self.port2_status.setStyleSheet("color: green" if is_connected else "color: red")
+
     def read_model_info(self):
         """모델 정보 읽기"""
-        QMessageBox.information(self, "알림", "모델 정보 읽기 기능이 구현될 예정입니다.")
+        if not self._check_selected_port_connected():
+            return
+
+        try:
+            # 선택된 포트의 SerialPort 객체 가져오기
+            serial_port = self._get_selected_serial_port()
+            if not serial_port:
+                return
+
+            # 명령어 전송
+            command = "db r model\r\n"
+            serial_port.write(command.encode())
+
+            # 응답 읽기
+            response = ""
+            while True:
+                if serial_port.in_waiting:
+                    line = serial_port.readline().decode('utf-8', errors='ignore')
+                    response += line
+                    
+                    # 응답이 완료되었는지 확인
+                    if "serial_number =" in line:
+                        break
+
+            # 응답 파싱
+            model_name = ""
+            serial_number = ""
+            
+            for line in response.split('\n'):
+                line = line.strip()
+                if "model_name" in line:
+                    model_name = line.split('=')[1].strip()
+                elif "serial_number" in line:
+                    serial_number = line.split('=')[1].strip()
+
+            # UI 업데이트
+            self.model_name_label.setText(model_name)
+            self.serial_number_label.setText(serial_number)
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"모델 정보 읽기 실패: {str(e)}")
+
+    def _get_selected_serial_port(self):
+        """선택된 포트의 SerialPort 객체 반환"""
+        parent = self.parent()
+        if self.port1_radio.isChecked():
+            if hasattr(parent, 'left_port_selector'):
+                return parent.left_port_selector.serial_port
+        else:
+            if hasattr(parent, 'right_port_selector'):
+                return parent.right_port_selector.serial_port
+        
+        QMessageBox.warning(self, "경고", "선택된 포트를 찾을 수 없습니다.")
+        return None
+
+    def _format_response_text(self, text):
+        """응답 텍스트 포맷팅"""
+        formatted = ""
+        for line in text.split('\n'):
+            line = line.strip()
+            if line:
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    formatted += f"{key.strip():15} = {value.strip()}\n"
+                else:
+                    formatted += line + '\n'
+        return formatted.strip()
 
     def write_model_info(self):
         """모델 정보 쓰기"""
-        QMessageBox.information(self, "알림", "모델 정보 쓰기 기능이 구현될 예정입니다.")
+        if not self._check_selected_port_connected():
+            return
+            
+        # TODO: 선택된 포트로 명령어 전송
+        selected_port = "Monitor 1" if self.port1_radio.isChecked() else "Monitor 2"
+        QMessageBox.information(self, "알림", f"{selected_port}을 통해 모델 정보를 씁니다.")
+
+    def _check_selected_port_connected(self):
+        """선택된 포트의 연결 상태 확인"""
+        if self.port1_radio.isChecked():
+            if self.port1_status.text() == "미연결":
+                QMessageBox.warning(self, "경고", "Monitor 1이 연결되지 않았습니다.")
+                return False
+        else:
+            if self.port2_status.text() == "미연결":
+                QMessageBox.warning(self, "경고", "Monitor 2가 연결되지 않았습니다.")
+                return False
+        return True
 
     def _setup_download_tab(self):
         """Download 탭 설정"""
