@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
         oc_text.setText("""
             <div style='text-align: center;'>
                 <div style='font-size: 60pt; font-weight: bold; color: black;'>OC</div>
-                <div style='font-size: 20pt; color: black;'>Operation Control</div>
+                <div style='font-size: 20pt; color: black;'>Operation Center</div>
             </div>
         """)
         oc_text.setGeometry(0, 0, button_size[0], button_size[1])
@@ -150,7 +150,7 @@ class MainWindow(QMainWindow):
         qc_text.setText("""
             <div style='text-align: center;'>
                 <div style='font-size: 60pt; font-weight: bold; color: black;'>QC</div>
-                <div style='font-size: 20pt; color: black;'>Quality Control</div>
+                <div style='font-size: 20pt; color: black;'>Quality Center</div>
             </div>
         """)
         qc_text.setGeometry(0, 0, button_size[0], button_size[1])

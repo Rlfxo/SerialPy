@@ -12,7 +12,7 @@ from .qc_management_dialog import QCManagementDialog  # 새로 만들 관리 팝
 class QCWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Quality Control")
+        self.setWindowTitle("Quality Center")
         
         # 다이얼로그 초기화
         self.management_dialog = None

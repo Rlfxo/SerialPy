@@ -74,7 +74,7 @@ class DownloadPanel(QWidget):
             self,
             "다운로드 파일 선택",
             "",
-            "Binary Files (*.bin);;All Files (*.*)"
+            "Firmware Files (*.bin *.hex *.img);;All Files (*.*)"
         )
         
         if file_path:

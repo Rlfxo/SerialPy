@@ -124,6 +124,8 @@ class QCManagementDialog(QDialog):
         self.header_manager = HeaderManager()
         self.setWindowTitle('Quality Control Management')
         self.setFixedSize(800, 650)
+        # 항상 최상위에 표시
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
         # 메인 레이아웃
         layout = QVBoxLayout()
@@ -239,7 +241,7 @@ class QCManagementDialog(QDialog):
             self,
             "이미지 파일 선택",
             "",
-            "Image Files (*.img);;All Files (*.*)"
+            "Image Files (*.bin *.hex *.img);;All Files (*.*)"
         )
         
         if file_path:
