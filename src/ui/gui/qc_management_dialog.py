@@ -606,6 +606,17 @@ class QCManagementDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "오류", f"모델 정보 저장 중 오류가 발생했습니다: {str(e)}")
 
+    def show_header_tab(self):
+        """Header 탭으로 전환"""
+        self.tab_widget.setCurrentIndex(0)  # Header 탭의 인덱스는 0
+        self.show()
+
     def show_device_tab(self):
         """Device 탭으로 전환"""
-        self.tab_widget.setCurrentIndex(1) 
+        self.tab_widget.setCurrentIndex(1)  # Device 탭의 인덱스는 1
+        self.show()
+
+    def show_download_tab(self):
+        """Download 탭으로 전환"""
+        self.tab_widget.setCurrentIndex(2)  # Download 탭의 인덱스는 2
+        self.show() 
