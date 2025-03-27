@@ -36,6 +36,7 @@ class LogViewer(QWidget):
         super().__init__(parent)
         self.reader_thread = None
         self.user_scrolling = False
+        self.is_paused = False
         self.scroll_timer = None
         self.log_dir = self._ensure_log_directory()
         self.initUI()
@@ -71,17 +72,22 @@ class LogViewer(QWidget):
         clear_btn = QPushButton('지우기')
         save_btn = QPushButton('전체 저장')
         save_selection_btn = QPushButton('선택 저장')
+        self.pause_btn = QPushButton('일시정지')
         self.auto_scroll_btn = QPushButton('자동 스크롤')
+        
+        self.pause_btn.setCheckable(True)
         self.auto_scroll_btn.setCheckable(True)
         self.auto_scroll_btn.setChecked(True)
         
         clear_btn.clicked.connect(self.clear_log)
         save_btn.clicked.connect(self.save_log)
         save_selection_btn.clicked.connect(self.save_selected_log)
+        self.pause_btn.clicked.connect(self.toggle_pause)
         
         button_layout.addWidget(clear_btn)
         button_layout.addWidget(save_btn)
         button_layout.addWidget(save_selection_btn)
+        button_layout.addWidget(self.pause_btn)
         button_layout.addWidget(self.auto_scroll_btn)
         button_layout.addStretch()
         
@@ -146,14 +152,31 @@ class LogViewer(QWidget):
 
     def process_log(self, text):
         """로그 텍스트 처리"""
+        if self.is_paused:
+            return  # 일시정지 상태면 로그 업데이트 하지 않음
+            
         cursor = self.log_text.textCursor()
+        had_selection = cursor.hasSelection()
+        selection_start = cursor.selectionStart()
+        selection_end = cursor.selectionEnd()
         
         # ANSI 이스케이프 코드 제거
         ansi_pattern = re.compile(r'\x1b\[\d+m')
         clean_text = ansi_pattern.sub('', text)
         
-        # 텍스트 추가
+        # 현재 커서 위치 저장
+        current_position = cursor.position()
+        
+        # 텍스트 끝으로 이동하여 추가
+        cursor.movePosition(QTextCursor.End)
         cursor.insertText(clean_text)
+        
+        # 선택 영역이 있었다면 복원
+        if had_selection:
+            cursor.setPosition(selection_start)
+            cursor.setPosition(selection_end, QTextCursor.KeepAnchor)
+            self.log_text.setTextCursor(cursor)
+            self.user_scrolling = True
         
         # 자동 스크롤 처리
         if self.auto_scroll_btn.isChecked() and not self.user_scrolling:
@@ -288,3 +311,11 @@ class LogViewer(QWidget):
                 
         except Exception as e:
             print(f"검색 중 오류 발생: {str(e)}")
+
+    def toggle_pause(self):
+        """로그 업데이트 일시정지/재개"""
+        self.is_paused = self.pause_btn.isChecked()
+        if self.is_paused:
+            self.pause_btn.setText('재개')
+        else:
+            self.pause_btn.setText('일시정지')
