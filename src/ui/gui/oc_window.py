@@ -16,10 +16,10 @@ class OCWindow(QMainWindow):
         self.progress_bar = None
         self.shortcut_manager = None
         
+        self.setWindowTitle('Operation Center')
         self.initUI()
         
     def initUI(self):
-        self.setWindowTitle('Operation Control')
         self.setFixedSize(800, 400)  # QC보다 작은 크기
         
         central_widget = QWidget()

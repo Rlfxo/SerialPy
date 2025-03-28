@@ -1,9 +1,14 @@
 from PyQt5.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QWidget, 
                            QTableWidget, QTableWidgetItem, QHeaderView,
-                           QPushButton, QHBoxLayout, QFileDialog, QMessageBox)
+                           QPushButton, QHBoxLayout, QFileDialog, QMessageBox,
+                           QGroupBox, QGridLayout, QLabel, QLineEdit, QFrame,
+                           QRadioButton, QComboBox)
+from PyQt5.QtGui import QIntValidator
 from PyQt5.QtCore import Qt
 import hashlib
 import binascii
+from ..components.download_panel import DownloadPanel
+import time
 
 class HeaderManager:
     def __init__(self):
@@ -118,34 +123,39 @@ class QCManagementDialog(QDialog):
         super().__init__(parent)
         self.header_manager = HeaderManager()
         self.setWindowTitle('Quality Control Management')
-        self.setFixedSize(800, 500)
+        self.setFixedSize(800, 650)
+        # 항상 최상위에 표시
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        # 메인 레이아웃
+        layout = QVBoxLayout()
         
-        layout = QVBoxLayout(self)
-        
-        # 탭 위젯 설정
+        # 탭 위젯 생성
         self.tab_widget = QTabWidget()
         
-        # 각 기능별 탭 생성
+        # 각 탭의 기본 위젯 생성
         self.header_tab = QWidget()
         self.device_tab = QWidget()
         self.download_tab = QWidget()
         
-        # Header 정보 탭 설정
+        # 각 탭 설정
         self._setup_header_tab()
-        
-        # 나머지 탭은 빈 레이아웃으로 설정
-        self.device_tab.setLayout(QVBoxLayout())
-        self.download_tab.setLayout(QVBoxLayout())
+        self._setup_device_tab()
+        self._setup_download_tab()
         
         # 탭 추가
-        self.tab_widget.addTab(self.header_tab, "Header 정보")
-        self.tab_widget.addTab(self.device_tab, "Device 정보")
+        self.tab_widget.addTab(self.header_tab, "Header")
+        self.tab_widget.addTab(self.device_tab, "Device")
         self.tab_widget.addTab(self.download_tab, "Download")
         
         layout.addWidget(self.tab_widget)
+        self.setLayout(layout)
+        
+        # 포트 상태 업데이트
+        self.update_port_status()
 
     def _setup_header_tab(self):
-        """Header 정보 탭 설정"""
+        """Header 탭 설정"""
         layout = QVBoxLayout(self.header_tab)
         
         # 버튼 영역
@@ -231,7 +241,7 @@ class QCManagementDialog(QDialog):
             self,
             "이미지 파일 선택",
             "",
-            "Image Files (*.img);;All Files (*.*)"
+            "Image Files (*.bin *.hex *.img);;All Files (*.*)"
         )
         
         if file_path:
@@ -315,20 +325,300 @@ class QCManagementDialog(QDialog):
             QMessageBox.critical(self, "오류", f"파일 저장 중 오류 발생: {str(e)}")
 
     def _setup_device_tab(self):
+        """Device 탭 설정"""
         layout = QVBoxLayout(self.device_tab)
-        self.device_info = DeviceInfoPanel(mode='qc')
-        layout.addWidget(self.device_info)
+        
+        # 포트 상태 표시 그룹
+        port_status_group = QGroupBox("포트 상태")
+        port_status_layout = QGridLayout()
+
+        # 포트 상태 레이블 생성
+        self.port1_status = QLabel("미연결")
+        self.port2_status = QLabel("미연결")
+        self.port1_status.setStyleSheet("color: red")
+        self.port2_status.setStyleSheet("color: red")
+
+        # 포트 선택 라디오 버튼
+        self.port1_radio = QRadioButton("Monitor 1")
+        self.port2_radio = QRadioButton("Monitor 2")
+        self.port1_radio.setChecked(True)  # 기본값 Monitor 1 선택
+
+        # 포트 상태 레이아웃 구성
+        port_status_layout.addWidget(self.port1_radio, 0, 0)
+        port_status_layout.addWidget(self.port1_status, 0, 1)
+        port_status_layout.addWidget(self.port2_radio, 1, 0)
+        port_status_layout.addWidget(self.port2_status, 1, 1)
+
+        port_status_group.setLayout(port_status_layout)
+        layout.addWidget(port_status_group)
+
+        # 기본 정보 입력 그룹
+        info_group = QGroupBox("모델 정보")
+        info_layout = QGridLayout()
+
+        # 모델명 입력
+        self.model_name_input = QLineEdit()
+        info_layout.addWidget(QLabel("모델명:"), 0, 0)
+        info_layout.addWidget(self.model_name_input, 0, 1)
+
+        # 시리얼 번호 입력
+        self.serial_number_input = QLineEdit()
+        info_layout.addWidget(QLabel("시리얼 번호:"), 1, 0)
+        info_layout.addWidget(self.serial_number_input, 1, 1)
+
+        # 읽기/쓰기 버튼
+        read_btn = QPushButton("정보 읽기")
+        write_btn = QPushButton("정보 쓰기")
+        read_btn.clicked.connect(self.read_model_info)
+        write_btn.clicked.connect(self.write_model_info)
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(read_btn)
+        btn_layout.addWidget(write_btn)
+        info_layout.addLayout(btn_layout, 2, 1)
+        
+        info_group.setLayout(info_layout)
+        layout.addWidget(info_group)
+
+        # 빠른 쓰기 그룹
+        quick_write_group = QGroupBox("빠른 정보 쓰기")
+        quick_write_layout = QGridLayout()
+
+        # 모델명 콤보박스
+        self.model_combo = QComboBox()
+        model_list = [
+            "E01AS007K10KR0101",
+            "E01AS011K10KR0101",
+            "E01DM050K10KR0102"
+        ]
+        self.model_combo.addItems(model_list)
+        quick_write_layout.addWidget(QLabel("모델명:"), 0, 0)
+        quick_write_layout.addWidget(self.model_combo, 0, 1, 1, 2)
+
+        # 시리얼 번호 구성 요소들
+        serial_layout = QHBoxLayout()
+        
+        # 시리얼 접두어 콤보박스
+        self.serial_prefix_combo = QComboBox()
+        serial_prefix_list = ["EVSCA", "EVSCB", "EVSCC", "EVSCD"]
+        self.serial_prefix_combo.addItems(serial_prefix_list)
+        
+        # 시리얼 번호 입력 필드
+        self.serial_number_edit = QLineEdit()
+        self.serial_number_edit.setPlaceholderText("숫자 6자리")
+        self.serial_number_edit.setMaxLength(6)
+        self.serial_number_edit.setValidator(QIntValidator(0, 999999))
+
+        serial_layout.addWidget(self.serial_prefix_combo)
+        serial_layout.addWidget(self.serial_number_edit)
+
+        quick_write_layout.addWidget(QLabel("시리얼 번호:"), 1, 0)
+        quick_write_layout.addLayout(serial_layout, 1, 1, 1, 2)
+
+        # 빠른 쓰기 버튼
+        quick_write_btn = QPushButton("빠른 쓰기")
+        quick_write_btn.clicked.connect(self.quick_write_model_info)
+        quick_write_layout.addWidget(quick_write_btn, 2, 1)
+
+        quick_write_group.setLayout(quick_write_layout)
+        layout.addWidget(quick_write_group)
 
     def _setup_download_tab(self):
+        """Download 탭 설정"""
         layout = QVBoxLayout(self.download_tab)
+        
+        # 다운로드 패널 추가
         self.download_panel = DownloadPanel()
         layout.addWidget(self.download_panel)
+        
+        # 여백 추가
+        layout.addStretch()
+
+    def update_port_status(self):
+        """포트 연결 상태 업데이트"""
+        # QCWindow의 포트 상태 확인
+        if hasattr(self.parent(), 'left_port_selector'):
+            port_selector = self.parent().left_port_selector
+            is_connected = port_selector.is_connected
+            port_name = port_selector.port_combo.currentText() if is_connected else ""
+            
+            status_text = f"{port_name} 연결됨" if is_connected else "미연결"
+            self.port1_status.setText(status_text)
+            self.port1_status.setStyleSheet("color: green" if is_connected else "color: red")
+        
+        if hasattr(self.parent(), 'right_port_selector'):
+            port_selector = self.parent().right_port_selector
+            is_connected = port_selector.is_connected
+            port_name = port_selector.port_combo.currentText() if is_connected else ""
+            
+            status_text = f"{port_name} 연결됨" if is_connected else "미연결"
+            self.port2_status.setText(status_text)
+            self.port2_status.setStyleSheet("color: green" if is_connected else "color: red")
+
+    def read_model_info(self):
+        """모델 정보 읽기"""
+        if not self._check_selected_port_connected():
+            return
+
+        try:
+            # 선택된 포트의 SerialPort 객체 가져오기
+            serial_port = self._get_selected_serial_port()
+            if not serial_port:
+                return
+
+            # 명령어 전송
+            command = "db r model\r\n"
+            serial_port.write(command.encode())
+
+            # 응답 읽기
+            response = ""
+            while True:
+                if serial_port.in_waiting:
+                    line = serial_port.readline().decode('utf-8', errors='ignore')
+                    response += line
+                    
+                    # 응답이 완료되었는지 확인
+                    if "serial_number =" in line:
+                        break
+
+            # 응답 파싱
+            model_name = ""
+            serial_number = ""
+            
+            for line in response.split('\n'):
+                line = line.strip()
+                if "model_name" in line:
+                    model_name = line.split('=')[1].strip()
+                elif "serial_number" in line:
+                    serial_number = line.split('=')[1].strip()
+
+            # UI 업데이트
+            self.model_name_input.setText(model_name)
+            self.serial_number_input.setText(serial_number)
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"모델 정보 읽기 실패: {str(e)}")
+
+    def _get_selected_serial_port(self):
+        """선택된 포트의 SerialPort 객체 반환"""
+        parent = self.parent()
+        if self.port1_radio.isChecked():
+            if hasattr(parent, 'left_port_selector'):
+                return parent.left_port_selector.serial_port
+        else:
+            if hasattr(parent, 'right_port_selector'):
+                return parent.right_port_selector.serial_port
+        
+        QMessageBox.warning(self, "경고", "선택된 포트를 찾을 수 없습니다.")
+        return None
+
+    def _format_response_text(self, text):
+        """응답 텍스트 포맷팅"""
+        formatted = ""
+        for line in text.split('\n'):
+            line = line.strip()
+            if line:
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    formatted += f"{key.strip():15} = {value.strip()}\n"
+                else:
+                    formatted += line + '\n'
+        return formatted.strip()
+
+    def _write_serial_with_delay(self, serial_port, command, char_delay=0.001):
+        """글자 단위로 딜레이를 주면서 시리얼 데이터 전송"""
+        try:
+            for char in command:
+                serial_port.write(char.encode('utf-8'))
+                serial_port.flush()
+                time.sleep(char_delay)  # 각 글자 사이에 1ms 딜레이
+        except Exception as e:
+            print(f"시리얼 전송 오류: {str(e)}")
+            raise e
+
+    def write_model_info(self):
+        """일반 모델 정보 쓰기"""
+        if not self._check_selected_port_connected():
+            QMessageBox.warning(self, "경고", "선택된 포트가 연결되어 있지 않습니다.")
+            return
+
+        try:
+            model_name = self.model_name_input.text().strip()
+            serial_number = self.serial_number_input.text().strip()
+
+            if not model_name or not serial_number:
+                QMessageBox.warning(self, "경고", "모델명과 시리얼 번호를 모두 입력해주세요.")
+                return
+
+            command = f"db w model 1 {model_name} {serial_number}\r\n"
+            print(f"전송 명령어: [{command.strip()}]")
+            
+            serial_port = self._get_selected_serial_port()
+            self._write_serial_with_delay(serial_port, command)
+            
+            time.sleep(0.1)
+            
+            QMessageBox.information(self, "성공", "모델 정보가 성공적으로 저장되었습니다.")
+            self.read_model_info()
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"모델 정보 저장 중 오류가 발생했습니다: {str(e)}")
+
+    def _check_selected_port_connected(self):
+        """선택된 포트의 연결 상태 확인"""
+        if self.port1_radio.isChecked():
+            if self.port1_status.text() == "미연결":
+                QMessageBox.warning(self, "경고", "Monitor 1이 연결되지 않았습니다.")
+                return False
+        else:
+            if self.port2_status.text() == "미연결":
+                QMessageBox.warning(self, "경고", "Monitor 2가 연결되지 않았습니다.")
+                return False
+        return True
+
+    def quick_write_model_info(self):
+        """빠른 정보 쓰기 실행"""
+        if not self._check_selected_port_connected():
+            QMessageBox.warning(self, "경고", "선택된 포트가 연결되어 있지 않습니다.")
+            return
+
+        try:
+            model_name = self.model_combo.currentText()
+            serial_prefix = self.serial_prefix_combo.currentText()
+            serial_number = self.serial_number_edit.text().strip()
+
+            if not serial_number:
+                QMessageBox.warning(self, "경고", "시리얼 번호를 입력해주세요.")
+                return
+
+            serial_number = serial_number.zfill(6)
+            full_serial = f"{serial_prefix}{serial_number}"
+
+            command = f"db w model 1 {model_name} {full_serial}\r\n"
+            print(f"전송 명령어: [{command.strip()}]")
+            
+            serial_port = self._get_selected_serial_port()
+            self._write_serial_with_delay(serial_port, command)
+            
+            time.sleep(0.1)
+            
+            QMessageBox.information(self, "성공", "모델 정보가 성공적으로 저장되었습니다.")
+            self.read_model_info()
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"모델 정보 저장 중 오류가 발생했습니다: {str(e)}")
 
     def show_header_tab(self):
-        self.tab_widget.setCurrentIndex(0)
+        """Header 탭으로 전환"""
+        self.tab_widget.setCurrentIndex(0)  # Header 탭의 인덱스는 0
+        self.show()
 
     def show_device_tab(self):
-        self.tab_widget.setCurrentIndex(1)
+        """Device 탭으로 전환"""
+        self.tab_widget.setCurrentIndex(1)  # Device 탭의 인덱스는 1
+        self.show()
 
     def show_download_tab(self):
-        self.tab_widget.setCurrentIndex(2) 
+        """Download 탭으로 전환"""
+        self.tab_widget.setCurrentIndex(2)  # Download 탭의 인덱스는 2
+        self.show() 

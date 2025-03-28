@@ -10,10 +10,14 @@ from ..components.device_info_panel import DeviceInfoPanel
 from .qc_management_dialog import QCManagementDialog  # 새로 만들 관리 팝업
 
 class QCWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.qc_controller = QCController()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Quality Center")
+        
+        # 다이얼로그 초기화
         self.management_dialog = None
+        
+        self.qc_controller = QCController()
         
         # UI 컴포넌트 초기화
         self.port_selector = None
@@ -25,7 +29,6 @@ class QCWindow(QMainWindow):
         self.initUI()
         
     def initUI(self):
-        self.setWindowTitle('Quality Control - Monitoring')
         self.showMaximized()
         
         # 메인 위젯 설정
@@ -105,22 +108,22 @@ class QCWindow(QMainWindow):
         self.right_port_selector.port_connected.connect(self.on_right_port_connection_changed)
 
     def show_header_management(self):
-        if not self.management_dialog:
+        """Header 관리 다이얼로그 표시"""
+        if self.management_dialog is None:
             self.management_dialog = QCManagementDialog(self)
         self.management_dialog.show_header_tab()
-        self.management_dialog.exec_()
 
     def show_device_management(self):
-        if not self.management_dialog:
+        """Device 관리 다이얼로그 표시"""
+        if self.management_dialog is None:
             self.management_dialog = QCManagementDialog(self)
         self.management_dialog.show_device_tab()
-        self.management_dialog.exec_()
 
     def show_download_management(self):
-        if not self.management_dialog:
+        """Download 관리 다이얼로그 표시"""
+        if self.management_dialog is None:
             self.management_dialog = QCManagementDialog(self)
         self.management_dialog.show_download_tab()
-        self.management_dialog.exec_()
 
     def on_left_port_connection_changed(self, connected):
         if connected:
@@ -139,3 +142,9 @@ class QCWindow(QMainWindow):
         else:
             self.right_log_viewer.stop_monitoring()
             print("Right monitor stopped")
+
+    def closeEvent(self, event):
+        """창이 닫힐 때 다이얼로그도 함께 닫기"""
+        if self.management_dialog is not None:
+            self.management_dialog.close()
+        super().closeEvent(event)

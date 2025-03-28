@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                           QLabel, QProgressBar, QFileDialog)
+                           QLabel, QProgressBar, QFileDialog, QMessageBox)
 from PyQt5.QtCore import Qt
 
 class DownloadPanel(QWidget):
@@ -31,7 +31,7 @@ class DownloadPanel(QWidget):
         layout.addWidget(self.progress_bar)
 
         # 다운로드 버튼
-        self.download_btn = QPushButton("다운로드 시작")
+        self.download_btn = QPushButton("다운로드")
         self.download_btn.clicked.connect(self.start_download)
         self.download_btn.setEnabled(False)  # 파일 선택 전에는 비활성화
         layout.addWidget(self.download_btn)
@@ -69,31 +69,22 @@ class DownloadPanel(QWidget):
         """)
 
     def select_file(self):
-        """파일 선택 다이얼로그"""
-        file_name, _ = QFileDialog.getOpenFileName(
+        """파일 선택"""
+        file_path, _ = QFileDialog.getOpenFileName(
             self,
             "다운로드 파일 선택",
             "",
-            "Binary Files (*.bin);;All Files (*.*)"
+            "Firmware Files (*.bin *.hex *.img);;All Files (*.*)"
         )
-        if file_name:
-            self.file_label.setText(f"선택된 파일: {file_name}")
+        
+        if file_path:
+            self.file_label.setText(f"선택된 파일: {file_path}")
             self.download_btn.setEnabled(True)
-            self.selected_file = file_name
-        else:
-            self.file_label.setText("선택된 파일: 없음")
-            self.download_btn.setEnabled(False)
-            self.selected_file = None
 
     def start_download(self):
         """다운로드 시작"""
-        if not hasattr(self, 'selected_file') or not self.selected_file:
-            return
-        
-        # TODO: 실제 다운로드 로직 구현
-        self.status_label.setText("다운로드 준비 중...")
-        self.download_btn.setEnabled(False)
-        self.progress_bar.setValue(0)
+        # TODO: 실제 다운로드 기능 구현
+        QMessageBox.information(self, "알림", "다운로드 기능이 구현될 예정입니다.")
 
     def update_progress(self, value):
         """진행률 업데이트"""
